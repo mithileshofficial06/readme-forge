@@ -35,6 +35,8 @@ const SECTION_TOGGLES: { key: keyof GeneratorOptions; label: string }[] = [
   { key: "includeVisitorBadge", label: "Visitor count" },
 ];
 
+const EXAMPLES = ["torvalds", "sindresorhus", "octocat"];
+
 export default function Home() {
   const [input, setInput] = useState("");
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -49,8 +51,7 @@ export default function Home() {
     [profile, options],
   );
 
-  async function analyze(event: React.FormEvent) {
-    event.preventDefault();
+  async function run(value: string) {
     setLoading(true);
     setError(null);
 
@@ -58,7 +59,7 @@ export default function Home() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input }),
+        body: JSON.stringify({ input: value }),
       });
       const data: AnalyzeSuccess | AnalyzeError = await res.json();
 
@@ -97,185 +98,229 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-dvh bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <header className="mb-10">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            README Forge
-          </h1>
-          <p className="mt-2 max-w-2xl text-zinc-600 dark:text-zinc-400">
-            Turn any GitHub account into a ready-to-paste profile README. Drop it
-            in a repo named after your username to make it show up on your
-            profile.
-          </p>
-        </header>
+    <div className="mx-auto max-w-6xl px-6 py-14 sm:py-20">
+      <header className="text-center">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-widest text-[var(--muted)] uppercase backdrop-blur">
+          <span className="size-1.5 animate-pulse rounded-full bg-[var(--lime)]" />
+          Profile README generator
+        </span>
 
-        <form onSubmit={analyze} className="flex flex-col gap-3 sm:flex-row">
+        <h1 className="mt-7 text-6xl font-bold tracking-tighter sm:text-8xl">
+          <span className="gradient-text">README</span>
+          <span className="text-white"> Forge</span>
+        </h1>
+
+        <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-[var(--muted)] sm:text-lg">
+          Turn any GitHub account into a ready-to-paste profile README. Drop it
+          in a repo named after your username and it shows up on your profile.
+        </p>
+      </header>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void run(input);
+        }}
+        className="mx-auto mt-11 max-w-2xl"
+      >
+        <div className="glass glow-ring flex flex-col gap-2 rounded-2xl p-2 transition-all sm:flex-row sm:items-center">
+          <span className="hidden pl-4 font-mono text-sm text-[var(--violet)] sm:block">
+            github.com/
+          </span>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="octocat  ·  github.com/octocat  ·  https://github.com/octocat/repo"
+            placeholder="your-username"
             aria-label="GitHub username or profile URL"
-            className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-100"
+            className="min-w-0 flex-1 bg-transparent px-4 py-3 font-mono text-base text-white outline-none placeholder:text-white/25 sm:px-0"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="btn-primary rounded-xl px-7 py-3 text-sm font-bold tracking-wide"
           >
-            {loading ? "Analyzing…" : "Generate"}
+            {loading ? "Forging…" : "Generate ✦"}
           </button>
-        </form>
+        </div>
 
-        {error && (
-          <p
-            role="alert"
-            className="mt-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300"
-          >
-            {error}
-          </p>
-        )}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--muted)]">
+          <span>Try:</span>
+          {EXAMPLES.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                setInput(name);
+                void run(name);
+              }}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-white/70 transition-colors hover:border-[var(--violet)]/50 hover:text-white"
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      </form>
 
-        {profile && (
-          <div className="mt-10 grid gap-8 lg:grid-cols-[280px_1fr]">
-            <aside className="space-y-6">
-              <section className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <div className="flex items-center gap-3">
-                  {/* Plain <img>: avatars are remote and next/image would need
-                      a configured remote pattern for no real benefit here. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={profile.avatarUrl}
-                    alt=""
-                    width={48}
-                    height={48}
-                    className="size-12 rounded-full"
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{profile.name}</p>
-                    <p className="truncate text-sm text-zinc-500">
-                      @{profile.login}
-                    </p>
-                  </div>
+      {error && (
+        <p
+          role="alert"
+          className="mx-auto mt-6 max-w-2xl rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200 backdrop-blur"
+        >
+          {error}
+        </p>
+      )}
+
+      {profile && (
+        <div className="mt-14 grid gap-6 lg:grid-cols-[290px_1fr]">
+          <aside className="space-y-5">
+            <section className="glass rounded-2xl p-5">
+              <div className="flex items-center gap-3">
+                {/* Plain <img>: avatars are remote and next/image would need a
+                    configured remote pattern for no real benefit here. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={profile.avatarUrl}
+                  alt=""
+                  width={52}
+                  height={52}
+                  className="size-13 rounded-xl ring-2 ring-[var(--violet)]/40"
+                />
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-white">
+                    {profile.name}
+                  </p>
+                  <p className="truncate font-mono text-xs text-[var(--muted)]">
+                    @{profile.login}
+                  </p>
                 </div>
-                <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
-                  {[
+              </div>
+
+              <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
+                {(
+                  [
                     ["Repos", profile.publicRepos],
                     ["Stars", profile.totalStars],
                     ["Followers", profile.followers],
-                  ].map(([label, value]) => (
-                    <div key={label as string}>
-                      <dt className="text-xs text-zinc-500">{label}</dt>
-                      <dd className="text-sm font-semibold">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-
-              <section className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <h2 className="mb-3 text-sm font-semibold">Sections</h2>
-                <div className="space-y-2">
-                  {SECTION_TOGGLES.map(({ key, label }) => (
-                    <label
-                      key={key}
-                      className="flex cursor-pointer items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(options[key])}
-                        onChange={() => toggle(key)}
-                        className="size-4 rounded border-zinc-300 accent-zinc-900 dark:accent-zinc-100"
-                      />
+                  ] as const
+                ).map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-xl border border-white/5 bg-white/5 py-2.5"
+                  >
+                    <dd className="gradient-text text-lg font-bold">{value}</dd>
+                    <dt className="text-[0.65rem] tracking-wider text-[var(--muted)] uppercase">
                       {label}
-                    </label>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-                <label
-                  htmlFor="theme"
-                  className="mb-3 block text-sm font-semibold"
-                >
-                  Card theme
-                </label>
-                <select
-                  id="theme"
-                  value={options.theme}
-                  onChange={(e) =>
-                    setOptions((prev) => ({
-                      ...prev,
-                      theme: e.target.value as StatsTheme,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                >
-                  {THEMES.map((theme) => (
-                    <option key={theme} value={theme}>
-                      {theme}
-                    </option>
-                  ))}
-                </select>
-              </section>
-            </aside>
-
-            <main className="min-w-0">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <div className="flex rounded-lg border border-zinc-300 p-1 dark:border-zinc-700">
-                  {(["preview", "markdown"] as const).map((value) => (
-                    <button
-                      key={value}
-                      onClick={() => setTab(value)}
-                      className={`rounded px-3 py-1.5 text-sm capitalize transition-colors ${
-                        tab === value
-                          ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                          : "text-zinc-600 dark:text-zinc-400"
-                      }`}
-                    >
-                      {value}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="ml-auto flex gap-2">
-                  <button
-                    onClick={copyMarkdown}
-                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  >
-                    {copied ? "Copied ✓" : "Copy markdown"}
-                  </button>
-                  <button
-                    onClick={downloadMarkdown}
-                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                  >
-                    Download
-                  </button>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-                {tab === "preview" ? (
-                  <div className="overflow-x-auto p-6">
-                    <MarkdownPreview markdown={markdown} />
+                    </dt>
                   </div>
-                ) : (
-                  <pre className="overflow-x-auto p-6 text-xs leading-relaxed">
-                    <code>{markdown}</code>
-                  </pre>
-                )}
+                ))}
+              </dl>
+            </section>
+
+            <section className="glass rounded-2xl p-5">
+              <h2 className="mb-4 text-xs font-bold tracking-widest text-[var(--muted)] uppercase">
+                Sections
+              </h2>
+              <div className="space-y-2.5">
+                {SECTION_TOGGLES.map(({ key, label }) => (
+                  <label
+                    key={key}
+                    className="flex cursor-pointer items-center gap-3 text-sm text-white/80 transition-colors hover:text-white"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(options[key])}
+                      onChange={() => toggle(key)}
+                      className="tick"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="glass rounded-2xl p-5">
+              <label
+                htmlFor="theme"
+                className="mb-3 block text-xs font-bold tracking-widest text-[var(--muted)] uppercase"
+              >
+                Card theme
+              </label>
+              <select
+                id="theme"
+                value={options.theme}
+                onChange={(e) =>
+                  setOptions((prev) => ({
+                    ...prev,
+                    theme: e.target.value as StatsTheme,
+                  }))
+                }
+                className="w-full cursor-pointer rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-[var(--violet)]/60"
+              >
+                {THEMES.map((theme) => (
+                  <option key={theme} value={theme} className="bg-[#12101c]">
+                    {theme}
+                  </option>
+                ))}
+              </select>
+            </section>
+          </aside>
+
+          <main className="min-w-0">
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <div className="glass flex rounded-xl p-1">
+                {(["preview", "markdown"] as const).map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setTab(value)}
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all ${
+                      tab === value
+                        ? "btn-primary"
+                        : "text-[var(--muted)] hover:text-white"
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
               </div>
 
-              <p className="mt-4 text-sm text-zinc-500">
-                Next step: create a public repo named{" "}
-                <code className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs dark:bg-zinc-800">
-                  {profile.login}/{profile.login}
-                </code>{" "}
-                and save this as its README.md.
-              </p>
-            </main>
-          </div>
-        )}
-      </div>
+              <div className="ml-auto flex gap-2">
+                <button
+                  onClick={copyMarkdown}
+                  className="glass rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-[var(--violet)]/50"
+                >
+                  {copied ? "Copied ✓" : "Copy"}
+                </button>
+                <button
+                  onClick={downloadMarkdown}
+                  className="glass rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-[var(--cyan)]/50"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+
+            <div className="glass overflow-hidden rounded-2xl">
+              {tab === "preview" ? (
+                <div className="overflow-x-auto p-7">
+                  <MarkdownPreview markdown={markdown} />
+                </div>
+              ) : (
+                <pre className="overflow-x-auto p-7 font-mono text-xs leading-relaxed text-white/80">
+                  <code>{markdown}</code>
+                </pre>
+              )}
+            </div>
+
+            <p className="mt-5 text-center text-sm text-[var(--muted)]">
+              Next: create a public repo named{" "}
+              <code className="rounded-md bg-[var(--violet)]/15 px-2 py-1 font-mono text-xs text-fuchsia-300">
+                {profile.login}/{profile.login}
+              </code>{" "}
+              and save this as its README.md
+            </p>
+          </main>
+        </div>
+      )}
     </div>
   );
 }
