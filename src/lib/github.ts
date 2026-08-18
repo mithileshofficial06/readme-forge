@@ -133,6 +133,36 @@ function aggregateLanguages(repos: GitHubRepo[]): LanguageStat[] {
     .sort((a, b) => b.count - a.count);
 }
 
+/** Topics across all owned repos, most frequent first. Frequency ordering means
+ *  a stack the user actually leans on outranks a one-off experiment. */
+function aggregateTopics(repos: GitHubRepo[]): string[] {
+  const counts = new Map<string, number>();
+  for (const repo of repos) {
+    for (const topic of repo.topics ?? []) {
+      counts.set(topic, (counts.get(topic) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([topic]) => topic);
+}
+
+/** Free text for tech detection: topics, repo names and descriptions across
+ *  every owned repo. Hyphens and underscores become spaces so a repo called
+ *  `my-nextjs-blog` yields `nextjs` as its own token. */
+function buildTechCorpus(repos: GitHubRepo[]): string {
+  const parts: string[] = [];
+  for (const repo of repos) {
+    parts.push(repo.name.replace(/[-_]/g, " "));
+    if (repo.description) parts.push(repo.description);
+    if (repo.topics?.length) parts.push(repo.topics.join(" "));
+    // Deploy hosts are a reliable signal even when a repo has no description:
+    // a `*.vercel.app` homepage says more about the stack than the repo name.
+    if (repo.homepage) parts.push(repo.homepage.replace(/[./-]/g, " "));
+  }
+  return parts.join(" ");
+}
+
 function toSummary(repo: GitHubRepo): RepoSummary {
   return {
     name: repo.name,
@@ -183,6 +213,10 @@ export async function fetchProfile(
     totalForks: owned.reduce((sum, r) => sum + r.forks_count, 0),
     languages: aggregateLanguages(owned),
     topRepos,
+    topics: aggregateTopics(owned),
+    techCorpus: buildTechCorpus(owned),
+    // `owned` preserves the API's pushed-desc ordering, so index 0 is newest.
+    recentRepo: owned.length > 0 ? toSummary(owned[0]) : null,
   };
 
   // Whichever call ran second has the more current remaining count.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { generateReadme } from "@/lib/generator";
 import {
   DEFAULT_OPTIONS,
@@ -23,19 +23,42 @@ const THEMES: StatsTheme[] = [
   "onedark",
 ];
 
-const SECTION_TOGGLES: { key: keyof GeneratorOptions; label: string }[] = [
-  { key: "includeHeader", label: "Header" },
-  { key: "includeAbout", label: "About me" },
-  { key: "includeTechStack", label: "Tech stack" },
-  { key: "includeStats", label: "Stats card" },
-  { key: "includeTopLanguages", label: "Top languages" },
-  { key: "includeStreak", label: "Streak" },
-  { key: "includeTopProjects", label: "Projects" },
-  { key: "includeSocials", label: "Socials" },
-  { key: "includeVisitorBadge", label: "Visitor count" },
+/** `service` names the third-party host a section needs, or null if the section
+ *  is pure markdown and can never break. */
+const SECTIONS: {
+  key: keyof GeneratorOptions;
+  label: string;
+  service: string | null;
+}[] = [
+  { key: "includeHeader", label: "Header", service: null },
+  { key: "includeQuickStats", label: "Quick stats", service: null },
+  { key: "includeAbout", label: "About me", service: null },
+  { key: "includeTechStack", label: "Tech stack", service: null },
+  { key: "includeStats", label: "Stats card", service: "stats" },
+  { key: "includeTopLanguages", label: "Top languages", service: "stats" },
+  { key: "includeStreak", label: "Streak", service: "streak" },
+  { key: "includeActivityGraph", label: "Activity graph", service: "activity" },
+  { key: "includeTrophies", label: "Trophy case", service: "trophy" },
+  { key: "includeTopProjects", label: "Projects", service: null },
+  { key: "includeCurrentWork", label: "Current work", service: null },
+  { key: "includeSocials", label: "Socials", service: null },
+  { key: "includeVisitorBadge", label: "Visitor count", service: "visitors" },
+  { key: "includeFooter", label: "Footer", service: null },
 ];
 
 const EXAMPLES = ["torvalds", "sindresorhus", "octocat"];
+
+type Health = Record<string, boolean>;
+
+function Marker({ n, title }: { n: string; title: string }) {
+  return (
+    <div className="mb-4 flex items-baseline gap-3">
+      <span className="label text-[var(--muted-dim)]">.{n}</span>
+      <span className="label">{title}</span>
+      <span className="rule flex-1" />
+    </div>
+  );
+}
 
 export default function Home() {
   const [input, setInput] = useState("");
@@ -45,16 +68,54 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"preview" | "markdown">("preview");
   const [copied, setCopied] = useState(false);
+  const [health, setHealth] = useState<Health | null>(null);
+
+  // Card services go down without notice. Probe once, then switch off any
+  // section whose host is unreachable so we never emit a broken image.
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/health")
+      .then((res) => res.json())
+      .then((data: Health) => {
+        if (cancelled) return;
+        setHealth(data);
+        setOptions((prev) => {
+          const next = { ...prev };
+          for (const { key, service } of SECTIONS) {
+            if (service && data[service] === false) {
+              (next[key] as boolean) = false;
+            }
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        // A failed probe shouldn't block the tool — leave defaults alone.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const markdown = useMemo(
     () => (profile ? generateReadme(profile, options) : ""),
     [profile, options],
   );
 
+  const downCount = useMemo(() => {
+    if (!health) return 0;
+    return new Set(
+      SECTIONS.filter((s) => s.service && health[s.service] === false).map(
+        (s) => s.service,
+      ),
+    ).size;
+  }, [health]);
+
   async function run(value: string) {
     setLoading(true);
     setError(null);
-
     try {
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -62,7 +123,6 @@ export default function Home() {
         body: JSON.stringify({ input: value }),
       });
       const data: AnalyzeSuccess | AnalyzeError = await res.json();
-
       if (!res.ok) {
         setError((data as AnalyzeError).error ?? "Something went wrong.");
         setProfile(null);
@@ -93,58 +153,62 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
-  function toggle(key: keyof GeneratorOptions) {
-    setOptions((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
   return (
-    <div className="mx-auto max-w-6xl px-6 py-14 sm:py-20">
-      <header className="text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium tracking-widest text-[var(--muted)] uppercase backdrop-blur">
-          <span className="size-1.5 animate-pulse rounded-full bg-[var(--lime)]" />
-          Profile README generator
-        </span>
+    <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
+      {/* ---- Masthead ---- */}
+      <header className="border-b-2 border-[var(--line)] pb-10">
+        <div className="flex items-start justify-between gap-4">
+          <span className="label">Typography — Archivo / JetBrains Mono</span>
+          <span className="label hidden sm:block">Color — Graphite</span>
+        </div>
 
-        <h1 className="mt-7 text-6xl font-bold tracking-tighter sm:text-8xl">
-          <span className="gradient-text">README</span>
-          <span className="text-white"> Forge</span>
+        <h1 className="display mt-8 text-[15vw] leading-[0.82] sm:text-[7.5rem]">
+          README
+          <br />
+          <span className="text-[var(--muted)]">FORGE</span>
         </h1>
 
-        <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-[var(--muted)] sm:text-lg">
-          Turn any GitHub account into a ready-to-paste profile README. Drop it
-          in a repo named after your username and it shows up on your profile.
-        </p>
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <p className="max-w-md text-sm leading-relaxed text-[var(--muted)]">
+            Turn any GitHub account into a ready-to-paste profile README. Drop it
+            in a repo named after your username and it lands on your profile.
+          </p>
+          <div className="size-10 shrink-0 bg-white" aria-hidden="true" />
+        </div>
       </header>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run(input);
-        }}
-        className="mx-auto mt-11 max-w-2xl"
-      >
-        <div className="glass glow-ring flex flex-col gap-2 rounded-2xl p-2 transition-all sm:flex-row sm:items-center">
-          <span className="hidden pl-4 font-mono text-sm text-[var(--violet)] sm:block">
-            github.com/
+      {/* ---- Input ---- */}
+      <section className="mt-12">
+        <Marker n="01" title="Target account" />
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(input);
+          }}
+          className="brut flex flex-col sm:flex-row"
+        >
+          <span className="flex items-center border-b-2 border-[var(--hard)] bg-[#0d0d0d] px-4 py-3 text-xs tracking-widest text-[var(--muted)] sm:border-r-2 sm:border-b-0">
+            GITHUB.COM/
           </span>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="your-username"
+            placeholder="username"
             aria-label="GitHub username or profile URL"
-            className="min-w-0 flex-1 bg-transparent px-4 py-3 font-mono text-base text-white outline-none placeholder:text-white/25 sm:px-0"
+            className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-base text-white outline-none placeholder:text-[var(--muted-dim)]"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="btn-primary rounded-xl px-7 py-3 text-sm font-bold tracking-wide"
+            className="btn m-2 px-7 py-3 text-xs"
           >
-            {loading ? "Forging…" : "Generate ✦"}
+            {loading ? "Forging…" : "Generate"}
           </button>
-        </div>
+        </form>
 
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs text-[var(--muted)]">
-          <span>Try:</span>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="label">Try</span>
           {EXAMPLES.map((name) => (
             <button
               key={name}
@@ -153,174 +217,205 @@ export default function Home() {
                 setInput(name);
                 void run(name);
               }}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-white/70 transition-colors hover:border-[var(--violet)]/50 hover:text-white"
+              className="border border-[var(--line-bright)] px-3 py-1 text-xs text-[var(--muted)] transition-colors hover:bg-white hover:text-black"
             >
               {name}
             </button>
           ))}
         </div>
-      </form>
+
+        {downCount > 0 && (
+          <p className="mt-4 border-l-2 border-[#7a2626] bg-[#1a1010] px-4 py-3 text-xs leading-relaxed text-[var(--muted)]">
+            <strong className="text-white">{downCount}</strong> third-party card
+            service{downCount > 1 ? "s are" : " is"} unreachable right now. Those
+            sections were switched off so your README won&apos;t contain broken
+            images. Re-enable any of them below if you want them anyway.
+          </p>
+        )}
+      </section>
 
       {error && (
         <p
           role="alert"
-          className="mx-auto mt-6 max-w-2xl rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-center text-sm text-rose-200 backdrop-blur"
+          className="mt-6 border-2 border-[#7a2626] bg-[#1a1010] px-4 py-3 text-sm text-[#e8a0a0]"
         >
           {error}
         </p>
       )}
 
       {profile && (
-        <div className="mt-14 grid gap-6 lg:grid-cols-[290px_1fr]">
-          <aside className="space-y-5">
-            <section className="glass rounded-2xl p-5">
-              <div className="flex items-center gap-3">
-                {/* Plain <img>: avatars are remote and next/image would need a
-                    configured remote pattern for no real benefit here. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={profile.avatarUrl}
-                  alt=""
-                  width={52}
-                  height={52}
-                  className="size-13 rounded-xl ring-2 ring-[var(--violet)]/40"
-                />
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-white">
-                    {profile.name}
-                  </p>
-                  <p className="truncate font-mono text-xs text-[var(--muted)]">
-                    @{profile.login}
-                  </p>
+        <>
+          {/* ---- Configure ---- */}
+          <section className="mt-14 grid gap-6 lg:grid-cols-[300px_1fr] lg:items-start">
+            <aside className="space-y-6">
+              <div>
+                <Marker n="02" title="Profile" />
+                <div className="brut-thin p-4">
+                  <div className="flex items-center gap-3">
+                    {/* Plain <img>: remote avatars would need a next/image
+                        remote pattern for no real benefit. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={profile.avatarUrl}
+                      alt=""
+                      width={52}
+                      height={52}
+                      className="size-13 border-2 border-[var(--hard)] grayscale"
+                    />
+                    <div className="min-w-0">
+                      <p className="display truncate text-lg">{profile.name}</p>
+                      <p className="truncate text-xs text-[var(--muted)]">
+                        @{profile.login}
+                      </p>
+                    </div>
+                  </div>
+
+                  <dl className="mt-4 grid grid-cols-3 border-t border-[var(--line)]">
+                    {(
+                      [
+                        ["Repos", profile.publicRepos],
+                        ["Stars", profile.totalStars],
+                        ["Followers", profile.followers],
+                      ] as const
+                    ).map(([label, value], i) => (
+                      <div
+                        key={label}
+                        className={`py-3 text-center ${i > 0 ? "border-l border-[var(--line)]" : ""}`}
+                      >
+                        <dd className="display text-xl">{value}</dd>
+                        <dt className="label mt-1 text-[0.55rem]">{label}</dt>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
               </div>
 
-              <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
-                {(
-                  [
-                    ["Repos", profile.publicRepos],
-                    ["Stars", profile.totalStars],
-                    ["Followers", profile.followers],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="rounded-xl border border-white/5 bg-white/5 py-2.5"
-                  >
-                    <dd className="gradient-text text-lg font-bold">{value}</dd>
-                    <dt className="text-[0.65rem] tracking-wider text-[var(--muted)] uppercase">
-                      {label}
-                    </dt>
-                  </div>
-                ))}
-              </dl>
-            </section>
-
-            <section className="glass rounded-2xl p-5">
-              <h2 className="mb-4 text-xs font-bold tracking-widest text-[var(--muted)] uppercase">
-                Sections
-              </h2>
-              <div className="space-y-2.5">
-                {SECTION_TOGGLES.map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className="flex cursor-pointer items-center gap-3 text-sm text-white/80 transition-colors hover:text-white"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(options[key])}
-                      onChange={() => toggle(key)}
-                      className="tick"
-                    />
-                    {label}
-                  </label>
-                ))}
+              <div>
+                <Marker n="03" title="Sections" />
+                <div className="brut-thin space-y-2.5 p-4">
+                  {SECTIONS.map(({ key, label, service }) => {
+                    const dead = Boolean(
+                      service && health && health[service] === false,
+                    );
+                    return (
+                      <label
+                        key={key}
+                        className="flex cursor-pointer items-center gap-3 text-xs text-[#cfcfcf] transition-colors hover:text-white"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={Boolean(options[key])}
+                          onChange={() =>
+                            setOptions((p) => ({ ...p, [key]: !p[key] }))
+                          }
+                          className="tick"
+                        />
+                        <span className="flex-1">{label}</span>
+                        {service && (
+                          <span
+                            className="pip"
+                            data-state={
+                              !health ? "unknown" : dead ? "down" : "up"
+                            }
+                            title={
+                              !health
+                                ? "Checking service…"
+                                : dead
+                                  ? `${service} is unreachable`
+                                  : `${service} is up`
+                            }
+                          />
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-            </section>
 
-            <section className="glass rounded-2xl p-5">
-              <label
-                htmlFor="theme"
-                className="mb-3 block text-xs font-bold tracking-widest text-[var(--muted)] uppercase"
-              >
-                Card theme
-              </label>
-              <select
-                id="theme"
-                value={options.theme}
-                onChange={(e) =>
-                  setOptions((prev) => ({
-                    ...prev,
-                    theme: e.target.value as StatsTheme,
-                  }))
-                }
-                className="w-full cursor-pointer rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 font-mono text-sm text-white outline-none focus:border-[var(--violet)]/60"
-              >
-                {THEMES.map((theme) => (
-                  <option key={theme} value={theme} className="bg-[#12101c]">
-                    {theme}
-                  </option>
-                ))}
-              </select>
-            </section>
-          </aside>
+              <div>
+                <Marker n="04" title="Card theme" />
+                <select
+                  aria-label="Card theme"
+                  value={options.theme}
+                  onChange={(e) =>
+                    setOptions((p) => ({
+                      ...p,
+                      theme: e.target.value as StatsTheme,
+                    }))
+                  }
+                  className="brut-thin w-full cursor-pointer px-3 py-2.5 text-xs text-white outline-none"
+                >
+                  {THEMES.map((t) => (
+                    <option key={t} value={t} className="bg-[#171717]">
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </aside>
 
-          <main className="min-w-0">
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="glass flex rounded-xl p-1">
-                {(["preview", "markdown"] as const).map((value) => (
+            {/* ---- Output ---- */}
+            <div className="min-w-0">
+              <Marker n="05" title="Output" />
+
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                {(["preview", "markdown"] as const).map((v) => (
                   <button
-                    key={value}
-                    onClick={() => setTab(value)}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition-all ${
-                      tab === value
-                        ? "btn-primary"
-                        : "text-[var(--muted)] hover:text-white"
+                    key={v}
+                    onClick={() => setTab(v)}
+                    className={`px-4 py-2 text-xs font-bold tracking-widest uppercase transition-all ${
+                      tab === v
+                        ? "btn"
+                        : "border-2 border-[var(--line)] text-[var(--muted)] hover:text-white"
                     }`}
                   >
-                    {value}
+                    {v}
                   </button>
                 ))}
-              </div>
 
-              <div className="ml-auto flex gap-2">
-                <button
-                  onClick={copyMarkdown}
-                  className="glass rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-[var(--violet)]/50"
-                >
-                  {copied ? "Copied ✓" : "Copy"}
-                </button>
-                <button
-                  onClick={downloadMarkdown}
-                  className="glass rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:border-[var(--cyan)]/50"
-                >
-                  Download
-                </button>
-              </div>
-            </div>
-
-            <div className="glass overflow-hidden rounded-2xl">
-              {tab === "preview" ? (
-                <div className="overflow-x-auto p-7">
-                  <MarkdownPreview markdown={markdown} />
+                <div className="ml-auto flex gap-2">
+                  <button
+                    onClick={copyMarkdown}
+                    className="btn-ghost px-4 py-2 text-xs"
+                  >
+                    {copied ? "Copied ✓" : "Copy"}
+                  </button>
+                  <button
+                    onClick={downloadMarkdown}
+                    className="btn-ghost px-4 py-2 text-xs"
+                  >
+                    Download
+                  </button>
                 </div>
-              ) : (
-                <pre className="overflow-x-auto p-7 font-mono text-xs leading-relaxed text-white/80">
-                  <code>{markdown}</code>
-                </pre>
-              )}
-            </div>
+              </div>
 
-            <p className="mt-5 text-center text-sm text-[var(--muted)]">
-              Next: create a public repo named{" "}
-              <code className="rounded-md bg-[var(--violet)]/15 px-2 py-1 font-mono text-xs text-fuchsia-300">
-                {profile.login}/{profile.login}
-              </code>{" "}
-              and save this as its README.md
-            </p>
-          </main>
-        </div>
+              <div className="brut overflow-hidden">
+                {tab === "preview" ? (
+                  <div className="overflow-x-auto p-6">
+                    <MarkdownPreview markdown={markdown} />
+                  </div>
+                ) : (
+                  <pre className="overflow-x-auto p-6 text-[0.7rem] leading-relaxed text-[#c8c8c8]">
+                    <code>{markdown}</code>
+                  </pre>
+                )}
+              </div>
+
+              <p className="mt-5 border-l-2 border-[var(--line-bright)] py-1 pl-4 text-xs leading-relaxed text-[var(--muted)]">
+                Create a public repo named{" "}
+                <code className="bg-[#0d0d0d] px-1.5 py-0.5 text-white">
+                  {profile.login}/{profile.login}
+                </code>{" "}
+                and save this as its README.md
+              </p>
+            </div>
+          </section>
+        </>
       )}
+
+      <footer className="mt-20 border-t-2 border-[var(--line)] pt-6 text-center">
+        <span className="label">Thanks for watching</span>
+      </footer>
     </div>
   );
 }

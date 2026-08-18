@@ -67,6 +67,13 @@ export interface ProfileData {
   totalForks: number;
   languages: LanguageStat[];
   topRepos: RepoSummary[];
+  /** Every topic across owned repos, most frequent first. */
+  topics: string[];
+  /** Repo names, descriptions and topics joined — the haystack tech detection
+   *  scans, since most accounts never tag their repos. */
+  techCorpus: string;
+  /** Most recently pushed repo, used for the "currently working on" line. */
+  recentRepo: RepoSummary | null;
 }
 
 export type StatsTheme =
@@ -81,27 +88,37 @@ export type StatsTheme =
 
 export interface GeneratorOptions {
   includeHeader: boolean;
+  includeQuickStats: boolean;
   includeAbout: boolean;
   includeTechStack: boolean;
   includeStats: boolean;
   includeStreak: boolean;
   includeTopLanguages: boolean;
+  includeActivityGraph: boolean;
+  includeTrophies: boolean;
   includeTopProjects: boolean;
+  includeCurrentWork: boolean;
   includeSocials: boolean;
   includeVisitorBadge: boolean;
+  includeFooter: boolean;
   theme: StatsTheme;
 }
 
 export const DEFAULT_OPTIONS: GeneratorOptions = {
   includeHeader: true,
+  includeQuickStats: true,
   includeAbout: true,
   includeTechStack: true,
   includeStats: true,
   includeStreak: true,
   includeTopLanguages: true,
+  includeActivityGraph: true,
+  includeTrophies: true,
   includeTopProjects: true,
+  includeCurrentWork: true,
   includeSocials: true,
-  includeVisitorBadge: false,
+  includeVisitorBadge: true,
+  includeFooter: true,
   theme: "tokyonight",
 };
 

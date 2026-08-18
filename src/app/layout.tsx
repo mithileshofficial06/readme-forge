@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const display = Space_Grotesk({
+// Archivo carries the heavy grotesque weight the brutalist headings need;
+// JetBrains Mono handles everything else, including body copy.
+const display = Archivo({
   variable: "--font-display",
   subsets: ["latin"],
+  weight: ["600", "700", "800", "900"],
 });
 
 const mono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -22,11 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${display.variable} ${mono.variable} h-full`}>
       <body className="min-h-full">
-        {/* Decorative only — kept out of the flow so content never shifts. */}
-        <div className="aurora" aria-hidden="true">
-          <span />
-        </div>
-        <div className="grid-overlay" aria-hidden="true" />
+        <div className="texture" aria-hidden="true" />
         {children}
       </body>
     </html>

@@ -1,12 +1,37 @@
-import { badgeFor } from "./badges";
-import type { GeneratorOptions, ProfileData } from "./types";
+import { badgeForLanguage, frameworkBadges, toolBadges } from "./tech";
+import type { GeneratorOptions, ProfileData, StatsTheme } from "./types";
 
 const STATS_HOST = "https://github-readme-stats.vercel.app";
 const STREAK_HOST = "https://streak-stats.demolab.com";
+const ACTIVITY_HOST = "https://github-readme-activity-graph.vercel.app";
+const TROPHY_HOST = "https://github-profile-trophy.vercel.app";
 
-/** Bios, names and repo descriptions all come from GitHub accounts we don't
- *  control, and several sections interpolate them into raw HTML. Neutralize
- *  markup at the source. */
+/** Each card service names its themes differently, so the single theme the user
+ *  picks has to be translated per service or the image 404s / falls back ugly. */
+const ACTIVITY_THEME: Record<StatsTheme, string> = {
+  default: "github",
+  dark: "github-dark",
+  radical: "radical",
+  tokyonight: "tokyo-night",
+  dracula: "dracula",
+  gruvbox: "gruvbox",
+  merko: "merko",
+  onedark: "react-dark",
+};
+
+const TROPHY_THEME: Record<StatsTheme, string> = {
+  default: "flat",
+  dark: "darkhub",
+  radical: "radical",
+  tokyonight: "tokyonight",
+  dracula: "dracula",
+  gruvbox: "gruvbox",
+  merko: "darkhub",
+  onedark: "onedark",
+};
+
+/** Bios, names and repo descriptions come from accounts we don't control, and
+ *  several sections interpolate them into raw HTML. Neutralize markup here. */
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -21,25 +46,31 @@ function inline(text: string | null): string {
   return escapeHtml(text.replace(/\s*\r?\n\s*/g, " ").trim());
 }
 
-/** As `inline`, plus the pipe escaping that only table rows need. An em dash
- *  stands in for empty values so the column never collapses. */
+/** As `inline`, plus the pipe escaping only table rows need. */
 function tableCell(text: string | null): string {
   const value = inline(text);
   return value ? value.replace(/\|/g, "\\|") : "—";
 }
 
-function socialBadge(
-  label: string,
-  color: string,
-  logo: string,
-  href: string,
-): string {
-  return `[![${label}](https://img.shields.io/badge/-${encodeURIComponent(label)}-${color}?style=for-the-badge&logo=${logo}&logoColor=white)](${href})`;
+/**
+ * Wraps markdown in a centered div. The blank lines are load-bearing: a raw
+ * HTML block suspends markdown parsing until one appears, so without them the
+ * badges inside would render as literal text.
+ */
+function centered(...lines: string[]): string {
+  return ['<div align="center">', "", ...lines, "", "</div>"].join("\n");
 }
 
-/** Normalizes a user-entered website that may be missing its scheme. */
 function normalizeUrl(url: string): string {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function socialBadge(label: string, color: string, logo: string, href: string) {
+  return `[![${label}](https://img.shields.io/badge/${encodeURIComponent(label)}-${color}?style=for-the-badge&logo=${logo}&logoColor=white)](${href})`;
+}
+
+function heading(emoji: string, text: string): string {
+  return `## ${emoji} ${text}`;
 }
 
 export function generateReadme(
@@ -48,126 +79,218 @@ export function generateReadme(
 ): string {
   const { login, name } = profile;
   const { theme } = options;
-
   const blocks: string[] = [];
 
+  /* ---- Header ---------------------------------------------------------- */
   if (options.includeHeader) {
-    const header = [
-      `<h1 align="center">Hi 👋, I'm ${inline(name)}</h1>`,
+    const lines = [
+      `# Hi there 👋, I'm ${inline(name)}`,
+      "",
       profile.bio
-        ? `<h3 align="center">${inline(profile.bio)}</h3>`
-        : `<h3 align="center">A developer building things on GitHub</h3>`,
+        ? `### ${inline(profile.bio)}`
+        : "### Building things, one commit at a time",
     ];
-    blocks.push(header.join("\n"));
+
+    if (options.includeSocials) {
+      const socials = [
+        socialBadge("GitHub", "181717", "github", profile.profileUrl),
+      ];
+      if (profile.twitter) {
+        socials.push(
+          socialBadge("Twitter", "1DA1F2", "x", `https://twitter.com/${profile.twitter}`),
+        );
+      }
+      if (profile.blog) {
+        socials.push(
+          socialBadge("Portfolio", "FF5722", "googlechrome", normalizeUrl(profile.blog)),
+        );
+      }
+      lines.push("", socials.join("\n"));
+    }
+
+    blocks.push(centered(...lines));
   }
 
+  /* ---- Quick stats ------------------------------------------------------ */
+  if (options.includeQuickStats) {
+    // Followers is a live shields endpoint; the other two are baked from the
+    // data we fetched, so they reflect generation time rather than today.
+    const badges = [
+      `![Followers](https://img.shields.io/github/followers/${login}?label=Followers&style=for-the-badge&color=181717&logo=github&logoColor=white)`,
+      `![Stars](https://img.shields.io/badge/Total%20Stars-${profile.totalStars}-FFD700?style=for-the-badge&logo=starship&logoColor=white)`,
+      `![Repos](https://img.shields.io/badge/Repositories-${profile.publicRepos}-3178C6?style=for-the-badge&logo=github&logoColor=white)`,
+    ];
+    blocks.push(centered(badges.join("\n")));
+  }
+
+  /* ---- About ------------------------------------------------------------ */
   if (options.includeAbout) {
     const facts: string[] = [];
+
     if (profile.company) {
-      facts.push(`- 🏢 I'm currently working at **${inline(profile.company)}**`);
+      facts.push(`- 🏢 &nbsp;Currently working at **${inline(profile.company)}**`);
     }
     if (profile.location) {
-      facts.push(`- 📍 Based in **${inline(profile.location)}**`);
+      facts.push(`- 🌍 &nbsp;Based in **${inline(profile.location)}**`);
     }
-    facts.push(`- 📦 I maintain **${profile.publicRepos}** public repositories`);
-    if (profile.totalStars > 0) {
-      facts.push(`- ⭐ My projects have earned **${profile.totalStars}** stars`);
+    if (profile.recentRepo) {
+      facts.push(
+        `- 🔭 &nbsp;Most recently working on [**${tableCell(profile.recentRepo.name)}**](${profile.recentRepo.url})`,
+      );
     }
     if (profile.languages.length > 0) {
       const top = profile.languages.slice(0, 3).map((l) => `**${l.name}**`);
-      facts.push(`- 💬 Ask me about ${top.join(", ")}`);
+      facts.push(`- 💬 &nbsp;Ask me about ${top.join(", ")}`);
     }
-    facts.push(`- 🌱 On GitHub since **${profile.joinedYear}**`);
+    facts.push(
+      `- 📊 &nbsp;Maintaining **${profile.publicRepos}** public repositories with **${profile.totalStars}** total stars`,
+    );
     if (profile.blog) {
-      facts.push(`- 🔗 More about me at [${profile.blog}](${normalizeUrl(profile.blog)})`);
+      facts.push(
+        `- 🔗 &nbsp;Portfolio: [${inline(profile.blog)}](${normalizeUrl(profile.blog)})`,
+      );
+    }
+    facts.push(`- ⚡ &nbsp;Building on GitHub since **${profile.joinedYear}**`);
+
+    blocks.push([heading("🧭", "About Me"), "", ...facts].join("\n"));
+  }
+
+  /* ---- Tech stack ------------------------------------------------------- */
+  if (options.includeTechStack) {
+    const groups: string[] = [];
+
+    if (profile.languages.length > 0) {
+      const badges = profile.languages
+        .slice(0, 12)
+        .map((lang) => badgeForLanguage(lang.name));
+      groups.push("**Languages**", "", badges.join("\n"));
     }
 
-    blocks.push(["## 🚀 About Me", "", ...facts].join("\n"));
+    const frameworks = frameworkBadges(profile.techCorpus);
+    if (frameworks.length > 0) {
+      groups.push("", "**Frameworks & Libraries**", "", frameworks.slice(0, 14).join("\n"));
+    }
+
+    const tools = toolBadges(profile.techCorpus);
+    if (tools.length > 0) {
+      groups.push("", "**Tools & Platforms**", "", tools.slice(0, 14).join("\n"));
+    }
+
+    if (groups.length > 0) {
+      blocks.push([heading("🧰", "Tech Stack"), "", ...groups].join("\n"));
+    }
   }
 
-  if (options.includeTechStack && profile.languages.length > 0) {
-    // Deliberately no <p> wrapper: a raw HTML block suspends markdown parsing
-    // until the next blank line, which would leave these badges as literal text.
-    const badges = profile.languages
-      .slice(0, 12)
-      .map((lang) => badgeFor(lang.name))
-      .join("\n");
-    blocks.push(["## 🛠️ Tech Stack", "", badges].join("\n"));
-  }
-
-  const statCards: string[] = [];
+  /* ---- Stats cards ------------------------------------------------------ */
+  const cards: string[] = [];
   if (options.includeStats) {
-    statCards.push(
+    cards.push(
       `<img height="180em" src="${STATS_HOST}/api?username=${login}&show_icons=true&theme=${theme}&include_all_commits=true&count_private=true&hide_border=true" alt="${login}'s GitHub stats" />`,
     );
   }
   if (options.includeTopLanguages && profile.languages.length > 0) {
-    statCards.push(
+    cards.push(
       `<img height="180em" src="${STATS_HOST}/api/top-langs/?username=${login}&layout=compact&theme=${theme}&hide_border=true&langs_count=8" alt="Top languages" />`,
     );
   }
-  if (statCards.length > 0) {
+
+  if (cards.length > 0 || options.includeStreak) {
+    const inner: string[] = [];
+    // These are raw <img> tags, so they need no blank-line separation and can
+    // sit directly inside the div for side-by-side layout.
+    if (cards.length > 0) inner.push(cards.join("\n"));
+    if (options.includeStreak) {
+      inner.push(
+        `<img src="${STREAK_HOST}?user=${login}&theme=${theme}&hide_border=true" alt="GitHub streak" />`,
+      );
+    }
+    blocks.push([heading("📊", "GitHub Analytics"), "", centered(...inner)].join("\n"));
+  }
+
+  if (options.includeActivityGraph) {
     blocks.push(
-      ["## 📊 GitHub Stats", "", `<p align="center">`, ...statCards, `</p>`].join("\n"),
+      centered(
+        `<img src="${ACTIVITY_HOST}/graph?username=${login}&theme=${ACTIVITY_THEME[theme]}&hide_border=true&area=true" alt="Contribution activity graph" />`,
+      ),
     );
   }
 
-  if (options.includeStreak) {
+  if (options.includeTrophies) {
     blocks.push(
       [
-        `<p align="center">`,
-        `<img src="${STREAK_HOST}?user=${login}&theme=${theme}&hide_border=true" alt="GitHub streak" />`,
-        `</p>`,
+        heading("🏆", "Trophy Case"),
+        "",
+        centered(
+          `<img src="${TROPHY_HOST}?username=${login}&theme=${TROPHY_THEME[theme]}&no-frame=true&no-bg=true&column=7&margin-w=4" alt="GitHub trophies" />`,
+        ),
       ].join("\n"),
     );
   }
 
+  /* ---- Projects --------------------------------------------------------- */
   if (options.includeTopProjects && profile.topRepos.length > 0) {
     const rows = profile.topRepos.map((repo) => {
-      const title = repo.homepage
-        ? `[${tableCell(repo.name)}](${repo.url}) · [demo](${normalizeUrl(repo.homepage)})`
-        : `[${tableCell(repo.name)}](${repo.url})`;
-      return `| ${title} | ${tableCell(repo.description)} | ${tableCell(repo.language)} | ⭐ ${repo.stars} |`;
+      const links = [`[**${tableCell(repo.name)}**](${repo.url})`];
+      if (repo.homepage) {
+        links.push(`[↗](${normalizeUrl(repo.homepage)})`);
+      }
+      // Language first, then a couple of topics, gives a readable stack column
+      // without letting a heavily-tagged repo blow the table width out.
+      const stack = [repo.language, ...repo.topics.slice(0, 2)]
+        .filter(Boolean)
+        .map((t) => `\`${tableCell(t)}\``)
+        .join(" ");
+
+      return `| ${links.join(" ")} | ${tableCell(repo.description)} | ${stack || "—"} | ⭐ ${repo.stars} | 🍴 ${repo.forks} |`;
     });
 
     blocks.push(
       [
-        "## 📌 Featured Projects",
+        heading("📌", "Featured Projects"),
         "",
-        "| Project | Description | Language | Stars |",
-        "| :--- | :--- | :--- | ---: |",
+        "| Project | Description | Stack | Stars | Forks |",
+        "| :--- | :--- | :--- | ---: | ---: |",
         ...rows,
       ].join("\n"),
     );
   }
 
-  if (options.includeSocials) {
-    const socials = [
-      socialBadge("GitHub", "181717", "github", profile.profileUrl),
+  /* ---- Current work ----------------------------------------------------- */
+  if (options.includeCurrentWork && profile.recentRepo) {
+    const repo = profile.recentRepo;
+    const lines = [
+      heading("🔭", "Currently Working On"),
+      "",
+      `### [${tableCell(repo.name)}](${repo.url})`,
+      "",
+      repo.description
+        ? `> ${inline(repo.description)}`
+        : "> Latest project — more details coming soon.",
     ];
-    if (profile.twitter) {
-      socials.push(
-        socialBadge("Twitter", "1DA1F2", "x", `https://twitter.com/${profile.twitter}`),
+    if (repo.topics.length > 0) {
+      lines.push(
+        "",
+        repo.topics
+          .slice(0, 6)
+          .map((t) => `\`${tableCell(t)}\``)
+          .join(" "),
       );
     }
-    if (profile.blog) {
-      socials.push(
-        socialBadge("Website", "0A0A0A", "googlechrome", normalizeUrl(profile.blog)),
-      );
-    }
-
-    // Same HTML-block caveat as the tech stack badges — keep these as markdown.
-    blocks.push(["## 🤝 Connect With Me", "", socials.join("\n")].join("\n"));
+    blocks.push(lines.join("\n"));
   }
 
+  /* ---- Footer ----------------------------------------------------------- */
+  const footer: string[] = [];
   if (options.includeVisitorBadge) {
-    blocks.push(
-      [
-        `<p align="center">`,
-        `<img src="https://komarev.com/ghpvc/?username=${login}&label=Profile%20views&color=0e75b6&style=flat" alt="Profile views" />`,
-        `</p>`,
-      ].join("\n"),
+    footer.push(
+      `![Profile views](https://komarev.com/ghpvc/?username=${login}&label=Profile%20views&color=181717&style=for-the-badge)`,
     );
+  }
+  if (options.includeFooter) {
+    footer.push("", "⭐️ From [" + login + "](" + profile.profileUrl + ")");
+  }
+  if (footer.length > 0) {
+    blocks.push(centered(...footer));
   }
 
   return blocks.join("\n\n---\n\n") + "\n";
