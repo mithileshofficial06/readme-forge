@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, JetBrains_Mono } from "next/font/google";
+import { SilkBackground } from "./silk-background";
 import "./globals.css";
 
 // Archivo carries the heavy grotesque weight the brutalist headings need;
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${display.variable} ${mono.variable} h-full`}>
       <body className="min-h-full">
+        <SilkBackground />
         <div className="texture" aria-hidden="true" />
         {children}
       </body>
