@@ -232,7 +232,12 @@ export function SilkBackground() {
       gl.deleteShader(vs);
       gl.deleteShader(fs);
       gl.deleteBuffer(buffer);
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
+      // No WEBGL_lose_context here on purpose: getContext() returns the same
+      // context object for the life of a canvas, so force-losing it poisons the
+      // element rather than freeing it. StrictMode and Fast Refresh re-run this
+      // effect against that very same <canvas>, and every compile in the second
+      // run would fail against the dead context. Releasing the objects above is
+      // enough — the context goes when the canvas does.
     };
   }, []);
 
