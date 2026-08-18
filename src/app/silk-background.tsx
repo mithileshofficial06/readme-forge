@@ -86,14 +86,21 @@ void main() {
 
   float shade = mix(f, folds, 0.55);
 
-  vec3 base = vec3(0.098);
-  vec3 hi   = vec3(0.322);
+  // Strictly neutral greys, kept inside the graphite range: the panels sit at
+  // #171717, so the drape must stay below the reference board's mid-tone or it
+  // washes the page out instead of sitting behind it.
+  vec3 base = vec3(0.075);
+  vec3 hi   = vec3(0.215);
   vec3 col  = mix(base, hi, shade);
 
-  col += infl * 0.045;
+  col += infl * 0.028;
+
+  // Soft lift toward the top-centre, echoing the reference board's lighting.
+  vec2 lc = uv - vec2(0.5, 0.82);
+  col += 0.045 * exp(-dot(lc, lc) * 2.2);
 
   vec2 c = uv - 0.5;
-  col *= 1.0 - 0.5 * dot(c, c);
+  col *= 1.0 - 0.34 * dot(c, c);
 
   // Dither: 8-bit output bands badly across these shallow gradients.
   col += (hash(gl_FragCoord.xy + fract(u_time)) - 0.5) * 0.013;
