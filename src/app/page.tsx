@@ -158,7 +158,7 @@ export default function Home() {
       {/* ---- Masthead ---- */}
       <header className="border-b-2 border-[var(--line)] pb-10">
         <div className="flex items-start justify-between gap-4">
-          <span className="label">Typography — Archivo / JetBrains Mono</span>
+          <span className="label">Typography — Bricolage / Geist</span>
           <span className="label hidden sm:block">Color — Graphite</span>
         </div>
 

@@ -23,6 +23,7 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --font-display: var(--font-display), system-ui, sans-serif;
+  --font-sans: var(--font-sans), system-ui, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, monospace;
 }
 
@@ -41,8 +42,28 @@ body {
     var(--bg);
   background-attachment: fixed;
   color: var(--ink);
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Tabular figures keep the stat row from jittering as counts change. */
+  font-feature-settings: "tnum" 1;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Body copy is sans now, so anything machine-shaped has to claim the mono
+   back explicitly — the raw-markdown pane and inline code both rely on this. */
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* Form controls don't inherit the page font on their own. */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
 }
 
 /* Faint scanline texture — keeps the large flat areas from reading as dead. */
@@ -76,9 +97,17 @@ body {
 
 .display {
   font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 900;
+  /* 800 is the top of Bricolage's wght axis. */
+  font-weight: 800;
+  /* Optical size pinned to the axis maximum: the display cut, with tighter
+     apertures and finer joins than the 14pt text cut the font defaults to.
+     font-weight above still drives wght; this only overrides opsz. Elements
+     using --font-display without .display (the markdown preview headings) sit
+     nearer the text cut on purpose — that pane should read like GitHub, not
+     like a poster. */
+  font-variation-settings: "opsz" 96;
   letter-spacing: -0.045em;
-  line-height: 0.88;
+  line-height: 0.86;
   text-transform: uppercase;
 }
 
@@ -86,8 +115,8 @@ body {
 .label {
   font-family: var(--font-mono), monospace;
   font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
+  font-weight: 500;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -103,9 +132,9 @@ body {
   color: var(--hard);
   border: 2px solid var(--hard);
   box-shadow: 4px 4px 0 var(--hard);
-  font-family: var(--font-mono), monospace;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   transition:
     transform 0.08s ease,
@@ -134,9 +163,9 @@ body {
   background: var(--panel-raised);
   color: var(--ink);
   border: 2px solid var(--line-bright);
-  font-family: var(--font-mono), monospace;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   transition: all 0.1s ease;
 }
@@ -202,8 +231,8 @@ body {
 /* Approximates GitHub's rendered README inside the graphite panel. */
 
 .markdown-body {
-  font-family: var(--font-mono), monospace;
-  font-size: 0.84rem;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 0.9rem;
   line-height: 1.7;
   color: #d8d8d8;
 }
@@ -212,8 +241,9 @@ body {
 .markdown-body h2,
 .markdown-body h3 {
   font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  font-variation-settings: "opsz" 40;
+  letter-spacing: -0.025em;
   color: #fff;
   margin: 1.7rem 0 0.85rem;
 }
